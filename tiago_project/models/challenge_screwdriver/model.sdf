@@ -1,0 +1,74 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="challenge_screwdriver">
+    <static>false</static>
+    <link name="link">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.000052083</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>0.000052083</iyy>
+          <iyz>0.0</iyz>
+          <izz>0.000020833</izz>
+        </inertia>
+      </inertial>
+
+      <!-- Collision -->
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://challenge_screwdriver/mesh/challenge_screwdriver.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>30.0</mu>
+              <mu2>30.0</mu2>
+              <!-- fdir1 should typically be a unit vector; (0 0 0) is not valid -->
+              <fdir1>1 0 0</fdir1>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1000000.0</kp>
+              <kd>100.0</kd>
+              <min_depth>0.0025</min_depth>
+              <max_vel>1.0</max_vel>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <!-- Visual -->
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://challenge_screwdriver/mesh/challenge_screwdriver.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.8 0.1 0.1 1</ambient>   <!-- Dark red ambient -->
+          <diffuse>1.0 0.2 0.2 1</diffuse>   <!-- Bright red diffuse -->
+          <specular>0.5 0.5 0.5 1</specular> <!-- Some shininess -->
+          <emissive>0 0 0 1</emissive>       <!-- No emission -->
+        </material>
+      </visual>
+
+      <!-- Other physics properties -->
+      <velocity_decay>
+        <linear>0.0</linear>
+        <angular>0.0</angular>
+      </velocity_decay>
+      <self_collide>false</self_collide>
+      <kinematic>false</kinematic>
+      <gravity>true</gravity>
+
+    </link>
+  </model>
+</sdf>
+

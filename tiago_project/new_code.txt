@@ -1,0 +1,218 @@
+Sara Micol FERRAINA <ferraina.1857726@studenti.uniroma1.it>
+	
+12:30 (3 ore fa)
+	
+	
+a me
+// prima di tutto devi creare i messaggi
+
+// Centroid.msg
+string label
+float32 x
+float32 y
+float32 z
+
+//CentroidArray.msg
+Header header
+Centroid[] centroids
+
+((( Tempo (stamp)
+
+Frame di riferimento (frame_id)
+
+Numero progressivo (seq))))
+
+add_message_files(
+  FILES
+  FilteredObjectPercept.msg
+  Centroid.msg
+  CentroidArray.msg
+)
+
+MODIFICA IN CMAke
+1)
+add_message_files(
+  FILES
+  FilteredObjectPercept.msg
+  Centroid.msg
+  CentroidArray.msg
+)
+2) da terminale cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+
+my_workspace/
+├─ src/
+│ ├─ my_package/
+│ │ ├─ msg/
+│ │ │ ├─ Centroid.msg
+│ │ │ └─ CentroidArray.msg
+│ │ ├─ src/
+│ │ └─ package.xml
+└─ build/
+
+from my_package.msg import Centroid, CentroidArray
+vedere come viene importato in un caso message e farlo uguale 
+
+def mask_list_to_centroid(masks, depth_image, camera_info, max_points_per_obj=20000):
+    """Calcola il centroide 3D di ogni maschera data la profondità e la camera_info."""
+    if not isinstance(camera_info, CameraInfo):
+        raise TypeError('camera_info must be sensor_msgs.msg.CameraInfo')
+
+    K = camera_info.K
+    fx, fy, cx, cy = K[0], K[4], K[2], K[5]
+    centroids_3d = []
+
+    for mask in masks:
+        if not isinstance(mask, np.ndarray):
+            mask = np.array(mask)
+        if mask.ndim == 3:
+            mask2d = mask[:, :, 0]
+        else:
+            mask2d = mask
+        mask_bool = mask2d.astype(bool)
+        ys, xs = np.nonzero(mask_bool)
+        if len(xs) == 0:
+            centroids_3d.append(None)
+            continue
+
+        if len(xs) > max_points_per_obj:
+            idx = np.linspace(0, len(xs) - 1, max_points_per_obj).astype(int)
+            xs, ys = xs[idx], ys[idx]
+
+        # Calcolo coordinate 3D dei punti nel mask
+        points_3d = []
+        for x, y in zip(xs, ys):
+            z = float(depth_image[y, x])
+            if z <= 0 or np.isnan(z):
+                continue
+            X = (x - cx) * z / fx
+            Y = (y - cy) * z / fy
+            points_3d.append((X, Y, z))
+
+        if len(points_3d) == 0:
+            centroids_3d.append(None)
+            continue
+
+        points_3d = np.array(points_3d)
+        centroid = np.mean(points_3d, axis=0)
+        centroids_3d.append(tuple(centroid))
+
+    return centroids_3d
+
+from tuo_pacchetto.msg import Centroid, CentroidArray
+import rospy
+from cv_utils import _transform_point_xyz
+
+def publish_centroids_3d(centroids_3d, labels, camera_frame="xtion_rgb", target_frame="map", frame_id="map", topic="/centroids_custom"):
+    """
+    Pubblica i centroidi 3D già calcolati come custom message CentroidArray
+    trasformati nel frame target_frame.
+    
+    centroids_3d: lista di tuple (X, Y, Z) o None se la maschera era vuota
+    labels: lista di label corrispondenti alle maschere/detections
+    camera_frame: frame di origine (dove sono calcolati i centroidi)
+    target_frame: frame di destinazione per la pubblicazione
+    """
+    if len(centroids_3d) != len(labels):
+        rospy.logwarn("Numero di centroidi e labels non corrisponde")
+        return
+
+    msg_array = CentroidArray()
+    msg_array.header.stamp = rospy.Time.now()
+    msg_array.header.frame_id = frame_id
+
+    for i, centroid in enumerate(centroids_3d):
+        if centroid is None:
+            continue # salta maschere vuote
+
+        # Trasforma il centroide dal frame camera al frame target
+        try:
+            X, Y, Z = _transform_point_xyz(centroid, source_frame=camera_frame, target_frame=target_frame)
+        except Exception as e:
+            rospy.logwarn(f"Trasformazione centroide fallita: {e}")
+            continue
+
+        centroid_msg = Centroid()
+        centroid_msg.label = labels[i]
+        centroid_msg.x = X
+        centroid_msg.y = Y
+        centroid_msg.z = Z
+        msg_array.centroids.append(centroid_msg)
+
+    pub = rospy.Publisher(topic, CentroidArray, queue_size=1, latch=True)
+    rospy.sleep(0.05)
+    pub.publish(msg_array)
+	
+--------------------------------------------------------------------------------------------------------
+
+Sara Micol FERRAINA <ferraina.1857726@studenti.uniroma1.it>
+	
+13:23 (2 ore fa)
+	
+	
+a me
+def publish_objects(self):
+    """
+    Funzione principale che:
+    1. Ottiene frame sincronizzati (immagine, depth, camera_info)
+    2. Esegue il rilevamento oggetti
+    3. Calcola le maschere e pubblica la PointCloud degli oggetti
+    4. Calcola i centroidi 3D e li pubblica come CentroidArray
+    5. Visualizza i centroidi in RViz
+    """
+    # --- Step 1: Ottieni frame sincronizzati ---
+    synced = utils.get_synchronized_frame(timeout=1)
+    if synced is None:
+        rospy.logwarn("No synchronized frame available yet.")
+        return
+    image, depth, camera_info = synced
+
+    # --- Step 2: Esegui rilevamento oggetti ---
+    detections = self.run_detection(image, depth)
+    mask_list = [det.mask[:, :, 0] for det in detections]  # lista di maschere 2D
+
+    # --- Step 3: Pubblica PointCloud degli oggetti ---
+    self.color_pcl(image, detections)  # gestisce sia pcl aggregata che individuali
+
+    # --- Step 4: Calcola centroidi 3D da maschere ---
+    centroids_3d = mask_list_to_centroid(mask_list, depth, camera_info)
+
+    # --- Step 5: Pubblica CentroidArray ---
+    from manipulation_challenge.msg import Centroid, CentroidArray
+    centroid_array_msg = CentroidArray()
+    centroid_array_msg.header.stamp = rospy.Time.now()
+    centroid_array_msg.header.frame_id = camera_info.header.frame_id
+
+    points_for_rviz = []
+    labels_for_rviz = []
+    for det, c in zip(detections, centroids_3d):
+        if c is None:
+            continue
+        # Crea messaggio Centroid
+        centroid_msg = Centroid()
+        centroid_msg.x, centroid_msg.y, centroid_msg.z = c
+        centroid_msg.label = det.label
+        centroid_array_msg.centroids.append(centroid_msg)
+
+        # Prepara lista per RViz
+        points_for_rviz.append(c)
+        labels_for_rviz.append(det.label)
+
+    self.centroid_pub.publish(centroid_array_msg)
+
+    # --- Step 6: Visualizza centroidi in RViz ---
+    points_list_to_rviz_3d(
+        points_for_rviz,
+        labels=labels_for_rviz,
+        frame_id=camera_info.header.frame_id,
+        topic="/centroid_markers",
+        marker_scale=0.06
+    )
+
+    # --- Step 7: Disegna bounding box sull’immagine e pubblica ---
+    img_with_bb = draw_detections(image, detections)
+    img_msg = self.bridge.cv2_to_imgmsg(img_with_bb, encoding="bgr8")
+    self.pub_image.publish(img_msg)
+
+    rospy.loginfo("publish_objects: completato ciclo rilevamento e pubblicazioni")

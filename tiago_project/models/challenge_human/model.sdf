@@ -1,0 +1,45 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="challenge_human">
+    <static>true</static>
+
+    <link name="link">
+      <inertial>
+        <mass>70.0</mass>
+        <inertia>
+          <ixx>1.0</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>1.0</iyy>
+          <iyz>0.0</iyz>
+          <izz>1.0</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://challenge_human/mesh/human_model.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://challenge_human/mesh/human_model.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.8 0.7 0.6 1</ambient>
+          <diffuse>0.9 0.8 0.7 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
+
