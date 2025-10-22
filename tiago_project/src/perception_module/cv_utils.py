@@ -574,38 +574,61 @@ def publish_centroids_3d(centroids_3d, labels, camera_frame="xtion_rgb_optical_f
 
 def points_list_to_rviz_3d(points, labels=None, frame_id="map", topic="/centroid_markers", marker_scale=0.06):
     """
-    Visualizza una lista di punti 3D in RViz come sfere.
-    
+    Visualizza una lista di punti 3D in RViz come sfere con label sopra ciascun punto.
+
     :param points: lista di tuple (x, y, z)
     :param labels: lista di label corrispondenti (opzionale)
     :param frame_id: frame di riferimento per i marker
     :param topic: topic ROS su cui pubblicare i marker
-    :param marker_scale: dimensione delle sfere in RViz
+    :param marker_scale: dimensione delle sfere
     """
     pub = rospy.Publisher(topic, MarkerArray, queue_size=1, latch=True)
     marker_array = MarkerArray()
-    color = ColorRGBA(0.0, 1.0, 0.0, 1.0)  # verde pieno
+
+    color_sphere = ColorRGBA(0.0, 1.0, 0.0, 1.0)  # verde
+    color_text = ColorRGBA(1.0, 1.0, 1.0, 1.0)    # bianco per testo
 
     for i, point in enumerate(points):
         if point is None:
             continue
 
         x, y, z = point
-        marker = Marker()
-        marker.header.frame_id = frame_id
-        marker.header.stamp = rospy.Time.now()
-        marker.ns = "centroid_markers"
-        marker.id = i
-        marker.type = Marker.SPHERE
-        marker.action = Marker.ADD
-        marker.pose.position.x = x
-        marker.pose.position.y = y
-        marker.pose.position.z = z
-        marker.scale.x = marker.scale.y = marker.scale.z = marker_scale
-        marker.color = color
-        marker.lifetime = rospy.Duration(0)
+        label = labels[i] if labels and i < len(labels) else f"obj_{i}"
 
-        marker_array.markers.append(marker)
+        # --- Marker SFERA ---
+        sphere_marker = Marker()
+        sphere_marker.header.frame_id = frame_id
+        sphere_marker.header.stamp = rospy.Time.now()
+        sphere_marker.ns = "centroid_spheres"
+        sphere_marker.id = i
+        sphere_marker.type = Marker.SPHERE
+        sphere_marker.action = Marker.ADD
+        sphere_marker.pose.position.x = x
+        sphere_marker.pose.position.y = y
+        sphere_marker.pose.position.z = z
+        sphere_marker.scale.x = sphere_marker.scale.y = sphere_marker.scale.z = marker_scale
+        sphere_marker.color = color_sphere
+        sphere_marker.lifetime = rospy.Duration(0)
+
+        # --- Marker TESTO ---
+        text_marker = Marker()
+        text_marker.header.frame_id = frame_id
+        text_marker.header.stamp = rospy.Time.now()
+        text_marker.ns = "centroid_labels"
+        text_marker.id = i + 1000  # offset per non sovrapporre gli ID
+        text_marker.type = Marker.TEXT_VIEW_FACING
+        text_marker.action = Marker.ADD
+        text_marker.pose.position.x = x
+        text_marker.pose.position.y = y
+        text_marker.pose.position.z = z + marker_scale * 1.5  # un po' sopra la sfera
+        text_marker.scale.z = marker_scale * 1.2  # altezza testo
+        text_marker.color = color_text
+        text_marker.text = label
+        text_marker.lifetime = rospy.Duration(0)
+
+        # Aggiungi entrambi i marker all'array
+        marker_array.markers.append(sphere_marker)
+        marker_array.markers.append(text_marker)
 
     rospy.sleep(0.05)
     pub.publish(marker_array)

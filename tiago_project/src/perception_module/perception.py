@@ -278,59 +278,65 @@ class DetectObjects:
             marker_array.markers.append(marker)
         
         return marker_array
-
+    
+    
+    def _save_centroids_to_file(self, labels, centroids_3d, filename="centroids.txt"):
+        """Salva i centroidi correnti in un file txt nella stessa cartella dello script."""
+        try:
+            # Cartella dello script corrente
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(script_dir, filename)
+            
+            with open(file_path, "w") as f:
+                for label, centroid in zip(labels, centroids_3d):
+                    f.write(f"{label} {centroid[0]:.6f} {centroid[1]:.6f} {centroid[2]:.6f}\n")
+            
+            rospy.loginfo(f"Centroidi salvati su {file_path}")
+        except Exception as e:
+            rospy.logerr(f"Errore scrivendo i centroidi su file: {e}")
+    
     def publish_objects(self):
-        
-        # -Ottieni frame sincronizzati ---
+        # --- Step 1: Ottieni frame sincronizzati ---
         synced = utils.get_synchronized_frame(timeout=1)
         if synced is None:
             rospy.logwarn("No synchronized frame available yet.")
             return
         image, depth, camera_info = synced
 
-        # - Esegui rilevamento oggetti ---
+        # --- Step 2: Rilevamento oggetti ---
         detections = self.run_detection(image, depth)
-        mask_list = [det.mask[:, :, 0] for det in detections]  # lista di maschere 2D
+        mask_list = [det.mask[:, :, 0] for det in detections]
 
-        # -- Pubblica PointCloud degli oggetti ---
-        self.color_pcl(image, detections)  # gestisce sia pcl aggregata che individuali
+        # --- Step 3: Pubblica PointCloud (opzionale) ---
+        self.color_pcl(image, detections)
 
-        # - Calcola centroidi 3D da maschere ---
+        # --- Step 4: Calcola centroidi 3D nel frame della camera ---
         centroids_3d = mask_list_to_centroid(mask_list, depth, camera_info)
+        labels = [det.label for det in detections]
 
-        # -- Pubblica CentroidArray ---
-        from tiago_project.msg import Centroid, CentroidArray
-        centroid_array_msg = CentroidArray()
-        centroid_array_msg.header.stamp = rospy.Time.now()
-        centroid_array_msg.header.frame_id = camera_info.header.frame_id
+        # --- Step 5: Pubblica i centroidi trasformati nel frame "map" ---
+        publish_centroids_3d(
+            centroids_3d,
+            labels,
+            camera_frame=camera_info.header.frame_id,
+            target_frame="map",
+            frame_id="map",
+            topic="/centroids_custom"
+        )
 
-        points_for_rviz = []
-        labels_for_rviz = []
-        for det, c in zip(detections, centroids_3d):
-            if c is None:
-                continue
-            # Crea messaggio Centroid
-            centroid_msg = Centroid()
-            centroid_msg.x, centroid_msg.y, centroid_msg.z = c
-            centroid_msg.label = det.label
-            centroid_array_msg.centroids.append(centroid_msg)
-
-            # Prepara lista per RViz
-            points_for_rviz.append(c)
-            labels_for_rviz.append(det.label)
-
-        self.centroid_pub.publish(centroid_array_msg)
-
-        #  Visualizza centroidi in RViz ---
+        # --- Step 6: Visualizza centroidi in RViz ---
         points_list_to_rviz_3d(
-            points_for_rviz,
-            labels=labels_for_rviz,
-            frame_id=camera_info.header.frame_id,
+            centroids_3d,
+            labels=labels,
+            frame_id="map",
             topic="/centroid_markers",
             marker_scale=0.06
         )
 
-        # --- Step 7: Disegna bounding box sull’immagine e pubblica ---
+        # --- Step 7: Salva centroidi su file ---
+        self._save_centroids_to_file(labels, centroids_3d)
+
+        # --- Step 8: Pubblica immagine con bounding box ---
         img_with_bb = draw_detections(image, detections)
         img_msg = self.bridge.cv2_to_imgmsg(img_with_bb, encoding="bgr8")
         self.pub_image.publish(img_msg)
