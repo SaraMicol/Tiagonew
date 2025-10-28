@@ -148,7 +148,7 @@ class DetectObjects:
     def run_detection(self, image, depth):
         print("Running detection...")
         # DINO labels all tools as "tool"
-        #labels = ["brown_table", "screwdriver", "tool", "pincers", "wrench", "hammer"]
+        #labels = ["brown_table", "screwdriver", "tool", "pincers", "wrench", "hammer","avatar"]
         labels = ["table", "screwdriver", "pinchers", "wrench","hammer"]
         self.owlv2.set_classes(labels)
 
@@ -291,41 +291,20 @@ class DetectObjects:
         # - Esegui rilevamento oggetti ---
         detections = self.run_detection(image, depth)
         mask_list = [det.mask[:, :, 0] for det in detections]  # lista di maschere 2D
-
+        labels1=[det.label for det in detections]
         # -- Pubblica PointCloud degli oggetti ---
         self.color_pcl(image, detections)  # gestisce sia pcl aggregata che individuali
 
         # - Calcola centroidi 3D da maschere ---
         centroids_3d = mask_list_to_centroid(mask_list, depth, camera_info)
+        points1=publish_centroids_3d(centroids_3d,labels1, camera_frame=camera_info.header.frame_id, target_frame="map", frame_id="map", topic="/centroids_custom")
 
-        # -- Pubblica CentroidArray ---
-        from tiago_project.msg import Centroid, CentroidArray
-        centroid_array_msg = CentroidArray()
-        centroid_array_msg.header.stamp = rospy.Time.now()
-        centroid_array_msg.header.frame_id = camera_info.header.frame_id
-
-        points_for_rviz = []
-        labels_for_rviz = []
-        for det, c in zip(detections, centroids_3d):
-            if c is None:
-                continue
-            # Crea messaggio Centroid
-            centroid_msg = Centroid()
-            centroid_msg.x, centroid_msg.y, centroid_msg.z = c
-            centroid_msg.label = det.label
-            centroid_array_msg.centroids.append(centroid_msg)
-
-            # Prepara lista per RViz
-            points_for_rviz.append(c)
-            labels_for_rviz.append(det.label)
-
-        self.centroid_pub.publish(centroid_array_msg)
-
+        
         #  Visualizza centroidi in RViz ---
         points_list_to_rviz_3d(
-            points_for_rviz,
-            labels=labels_for_rviz,
-            frame_id=camera_info.header.frame_id,
+            points1,
+            labels=labels1,
+            frame_id="map",
             topic="/centroid_markers",
             marker_scale=0.06
         )

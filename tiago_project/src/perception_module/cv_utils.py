@@ -531,7 +531,7 @@ def mask_list_to_centroid(masks, depth_image, camera_info, max_points_per_obj=20
     return centroids_3d
 
 
-def publish_centroids_3d(centroids_3d, labels, camera_frame="xtion_rgb_optical_frame", target_frame="map", frame_id="map", topic="/centroids_custom"):
+def publish_centroids_3d(centroids_3d, labels, camera_frame, target_frame="map", frame_id="map", topic="/centroids_custom"):
     """
     Pubblica i centroidi 3D già calcolati come custom message CentroidArray
     trasformati nel frame target_frame.
@@ -547,7 +547,8 @@ def publish_centroids_3d(centroids_3d, labels, camera_frame="xtion_rgb_optical_f
 
     msg_array = CentroidArray()
     msg_array.header.stamp = rospy.Time.now()
-    msg_array.header.frame_id = frame_id
+    msg_array.header.frame_id = "map"
+    points1=[]
 
     for i, centroid in enumerate(centroids_3d):
         if centroid is None:
@@ -565,11 +566,13 @@ def publish_centroids_3d(centroids_3d, labels, camera_frame="xtion_rgb_optical_f
         centroid_msg.x = X
         centroid_msg.y = Y
         centroid_msg.z = Z
+        points1.append(tuple((X,Y,Z)))
         msg_array.centroids.append(centroid_msg)
 
     pub = rospy.Publisher(topic, CentroidArray, queue_size=1, latch=True)
     rospy.sleep(0.05)
     pub.publish(msg_array)
+    return points1
 	
 
 def points_list_to_rviz_3d(points, labels=None, frame_id="map", topic="/centroid_markers", marker_scale=0.06):
@@ -605,6 +608,7 @@ def points_list_to_rviz_3d(points, labels=None, frame_id="map", topic="/centroid
         marker.color = color
         marker.lifetime = rospy.Duration(0)
 
+        
         marker_array.markers.append(marker)
 
     rospy.sleep(0.05)

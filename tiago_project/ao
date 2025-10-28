@@ -1,0 +1,30 @@
+def callback(self, msg):
+    print("-" * 60)
+    print("new cycle")
+    
+    for i, marker in enumerate(msg.markers):
+        # Inizializza il marker di testo
+        text_marker = Marker()
+        text_marker.header.frame_id = marker.header.frame_id  # Usa lo stesso frame_id del marker originale
+        text_marker.header.stamp = rospy.Time.now()
+        text_marker.ns = "centroid_labels"
+        text_marker.id = i + 1000  # offset per non sovrapporre gli ID
+        text_marker.type = Marker.TEXT_VIEW_FACING
+        text_marker.action = Marker.ADD
+        text_marker.pose.position.x = marker.pose.position.x
+        text_marker.pose.position.y = marker.pose.position.y
+        text_marker.pose.position.z = marker.pose.position.z + marker.scale.x * 1.5  # un po' sopra la sfera
+
+        # Impostazioni della scala e del colore del testo
+        text_marker.scale.z = marker.scale.x * 1.2  # altezza del testo
+        text_marker.color = color_text  # imposta il colore del testo, esempio ColorRGBA(r=1, g=0, b=0, a=1)
+        
+        # Impostazioni del testo
+        label = f"Marker {i}"  # Puoi personalizzare il testo a seconda del marker
+        text_marker.text = label
+        
+        # Impostazioni della durata del marker
+        text_marker.lifetime = rospy.Duration(0)  # Marker visibile indefinitamente
+        
+        # Aggiungi il marker alla lista dei marker da pubblicare
+        self.marker_pub.publish(text_marker)
