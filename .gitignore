@@ -1,4 +1,3 @@
 /home/semanticnuc/Desktop/TiagoSara/Tiagonew/tiago_project/src/perception_module/utils/l2_decoder.onnx
 /home/semanticnuc/Desktop/TiagoSara/Tiagonew/tiago_project/src/perception_module/utils/l2_encoder.onnx
-*.pyc
-/home/semanticnuc/Desktop/TiagoSara/Tiagonew/tiago_project/readme.md
+*.onnx

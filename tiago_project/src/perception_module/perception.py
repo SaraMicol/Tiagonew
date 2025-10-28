@@ -46,7 +46,7 @@ class DetectObjects:
         self.centroid_pub=rospy.Publisher("/centroids_custom", CentroidArray, queue_size=1, latch=True)
         
         self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener= tf2_ros.TrasformListener(self.tf.buffer)
+        self.tf_listener= tf2_ros.TransformListener(self.tf_buffer)
 
         # Log device information so it's easy to verify GPU usage at runtime
         try:
