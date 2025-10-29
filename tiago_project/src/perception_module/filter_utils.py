@@ -64,7 +64,7 @@ def filter_marker(self, marker, label):
             text_marker.lifetime = rospy.Duration(0)
             
             self.element_pub+=1
-            rospy.loginfo(f"help1:{self.element_pub}")
+            rospy.loginfo(f"c'è un nuovo marker ora siamo a:{self.element_pub}")
             #self.new_markers.markers.append(sphere_marker)
             #self.new_markers.markers.append(text_marker)
                 
