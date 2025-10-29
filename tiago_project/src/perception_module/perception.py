@@ -149,7 +149,7 @@ class DetectObjects:
         print("Running detection...")
         # DINO labels all tools as "tool"
         #labels = ["brown_table", "screwdriver", "tool", "pincers", "wrench", "hammer","avatar"]
-        labels = ["table", "screwdriver", "pinchers", "wrench","hammer"]
+        labels = ["table", "screwdriver", "pinchers", "wrench","hammer","avatar"]
         self.owlv2.set_classes(labels)
 
         
