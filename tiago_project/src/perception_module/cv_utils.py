@@ -14,13 +14,11 @@ import json
 import struct
 import tf2_ros
 
-
-
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
-
 from tiago_project.msg import Centroid, CentroidArray
+
 
 def _get_R_and_T(trans):
     Tx_base = trans.transform.translation.x
@@ -544,11 +542,18 @@ def publish_centroids_3d(centroids_3d, labels, camera_frame, target_frame="map",
     if len(centroids_3d) != len(labels):
         rospy.logwarn("Numero di centroidi e labels non corrisponde")
         return
+    
+     #salvataggio detections in un text file
+    file_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "detections.txt")
 
     msg_array = CentroidArray()
     msg_array.header.stamp = rospy.Time.now()
     msg_array.header.frame_id = "map"
     points1=[]
+
+    with open(file_path, 'a') as f:
+            f.write(f"-"*60)
+            f.write(f"new_cycle \n")
 
     for i, centroid in enumerate(centroids_3d):
         if centroid is None:
@@ -560,6 +565,9 @@ def publish_centroids_3d(centroids_3d, labels, camera_frame, target_frame="map",
         except Exception as e:
             rospy.logwarn(f"Trasformazione centroide fallita: {e}")
             continue
+        
+        with open(file_path, 'a') as f:
+            f.write(f"detection: {labels[i]},{X:.6f}, {Y:.6f},{Z:.6f}\n")
 
         centroid_msg = Centroid()
         centroid_msg.label = labels[i]
@@ -587,17 +595,20 @@ def points_list_to_rviz_3d(points, labels=None, frame_id="map", topic="/centroid
     """
     pub = rospy.Publisher(topic, MarkerArray, queue_size=1, latch=True)
     marker_array = MarkerArray()
-    color = ColorRGBA(0.0, 1.0, 0.0, 1.0)  # verde pieno
+    color = ColorRGBA(0.0, 1.0, 0.0, 1.0)  # verde 
+    color_text=ColorRGBA(1.0, 1.0, 1.0, 1.0)  #bianco
 
     for i, point in enumerate(points):
         if point is None:
             continue
 
         x, y, z = point
+        label= labels[i] if labels and i < len(labels) else f"obj_{i}"
+
         marker = Marker()
         marker.header.frame_id = frame_id
         marker.header.stamp = rospy.Time.now()
-        marker.ns = "centroid_markers"
+        marker.ns = "centroid_spheres"
         marker.id = i
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
@@ -608,8 +619,23 @@ def points_list_to_rviz_3d(points, labels=None, frame_id="map", topic="/centroid
         marker.color = color
         marker.lifetime = rospy.Duration(0)
 
-        
+        text_marker=Marker()
+        text_marker.header.frame_id=frame_id
+        text_marker.header.stamp = rospy.Time.now()
+        text_marker.ns = "centroid_labels"
+        text_marker.id = i +1000
+        text_marker.type = Marker.TEXT_VIEW_FACING
+        text_marker.action = Marker.ADD
+        text_marker.pose.position.x = x
+        text_marker.pose.position.y = y
+        text_marker.pose.position.z = z + marker_scale * 1.5
+        text_marker.scale.z = marker_scale * 1.2
+        text_marker.color = color_text
+        text_marker.text=label
+        text_marker.lifetime = rospy.Duration(0)
+
         marker_array.markers.append(marker)
+        marker_array.markers.append(text_marker)
 
     rospy.sleep(0.05)
     pub.publish(marker_array)

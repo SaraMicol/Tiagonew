@@ -4,6 +4,10 @@ from visualization_msgs.msg import MarkerArray, Marker
 from cv_utils import  _transform_point_xyz
 from cv_utils import *
 import utils
+from filter_utils import filter_marker
+from tiago_project.msg import Centroid, CentroidArray
+from std_msgs.msg import ColorRGBA
+
 
 class CentroidFilter:
     def __init__(self):
@@ -12,6 +16,7 @@ class CentroidFilter:
         # Dizionario per salvare i centroidi già visti: {label: (x, y, z)}
         self.seen_centroids = {}
         self.stored_markers=[]
+        self.new_markers=[]
         # Soglia di distanza (in metri)
         self.distance_threshold = 0.1
         self.new_markers = MarkerArray()
@@ -31,74 +36,46 @@ class CentroidFilter:
     def callback(self, msg):
             print("-"*60)
             print("new cycle")
-            for marker in msg.markers:
-                #pubblico solo le spheres 
-                if marker.type == Marker.SPHERE:
-                    # Estrai il label
-                    label = marker.ns if marker.ns else str(marker.id)
-                    
-                    # Posizione del centroide ORIGINALE
-                    pos = (marker.pose.position.x, marker.pose.position.y, marker.pose.position.z)
-                    rospy.loginfo(f"help {marker.header.frame_id}")
-                    # TRASFORMA SUBITO in "map"
-                    #transformed_pos = _transform_point_xyz(pos,source_frame=marker.header.frame_id,target_frame="map")
-                    
-                    #camera_info = utils.get_latest_camera_info(timeout=1.0)
-                    #transformed_pos = _transform_point_xyz(pos,source_frame=camera_info.header.frame_id,target_frame="map")
 
-                    rospy.loginfo(f"Posizione originale per {label}: {pos}")
-                    #rospy.loginfo(f"Posizione trasformata per {label}: {transformed_pos}")
-                    
-                    # Controlla se è un centroide nuovo
-                    is_new = True
-                    
-                    if label in self.seen_centroids:
-                        dist = self.distance(pos, self.seen_centroids[label])
-                        rospy.loginfo(f"dstance {dist}")
-                        if dist < self.distance_threshold:
-                            is_new = False
-                            rospy.loginfo(f"Marker {label} già visto (distanza: {dist:.3f}m)")
-
-                    if is_new:
-                        # Salva il nuovo centroide
-                        rospy.loginfo(f"Nuovo marker {label} in posizione trasformata {pos}")
-
-                        # Crea il marker con la posizione trasformata
-
-                        # --- Marker SFERA ---
-                        sphere_marker = Marker()
-                        sphere_marker.header.frame_id = "map"
-                        sphere_marker.header.stamp = rospy.Time.now()
-                        sphere_marker.ns = "centroid_spheres" #_{string(element_pub)}
-                        sphere_marker.id = self.element_pub + 1 
-                        sphere_marker.type = Marker.SPHERE
-                        sphere_marker.action = Marker.ADD
-                        sphere_marker.pose.position.x = pos[0]
-                        sphere_marker.pose.position.y = pos[1]
-                        sphere_marker.pose.position.z = pos[2]
-                        sphere_marker.pose.orientation.w = 1.0
-                        sphere_marker.scale.x = sphere_marker.scale.y = sphere_marker.scale.z = 0.06
-                        sphere_marker.color.r = 1.0
-                        sphere_marker.color.g = 0.0
-                        sphere_marker.color.b = 0.0
-                        sphere_marker.color.a = 1.0
-                        sphere_marker.lifetime=rospy.Duration(0)
-                        
-                        self.element_pub+=1
-                        rospy.loginfo(f"help1:{self.element_pub}")
-                        self.new_markers.markers.append(sphere_marker)
-                    
-                        # Aggiungi il centroide alla lista di quelli già visti
-                        self.seen_centroids[label] = pos
-                    
-            '''
-            # Pubblica FUORI dal loop
-            all_markers = MarkerArray()
-            all_markers.markers = list(self.stored_markers.values())
-            rospy.loginfo(f"lables {list(self.stored_markers.values())}")
-            '''
+            labels_by_id={}
             
-            print("lenght",len(self.new_markers.markers))
+            # Ciclo sui marker per associare le etichette correttamente
+            # Ciclo sui marker per associare le etichette correttamente
+            for marker in msg.markers:
+                if marker.ns == "centroid_labels" and marker.type == Marker.TEXT_VIEW_FACING:
+                    label_id = marker.id
+                    labels_by_id[label_id] = marker.text  # Aggiungi l'etichetta al dizionario
+                    print("marker_text:", marker.text)
+
+            # Ciclo sui marker delle sfere per associare l'etichetta e aggiungere nuovi marker
+            for marker in msg.markers:
+                if marker.ns == "centroid_spheres" and marker.type == Marker.SPHERE:
+                    marker_id = marker.id + 1000  # ID delle etichette (i + 1000)
+                    print("marker_id:", marker_id)
+
+                    # Verifica se l'ID dell'etichetta è presente nel dizionario
+                    if marker_id in labels_by_id:
+                        label = labels_by_id[marker_id]
+                        print("label:", label)
+                    else:
+                        label = None  # Se non c'è una corrispondenza, imposta a None
+                        print(f"Nessuna etichetta trovata per marker con ID {marker_id}")
+
+                    # Ora puoi usare `label` in `filter_marker`
+                    markers = filter_marker(self, marker, label)
+                    #rospy.loginfo(f"Markers restituiti: {type(markers)}")
+
+                    #prendo solo il centroide
+                    # Verifica che markers non sia vuota prima di accedere
+                    if markers:
+                        # prendo solo il centroide (se markers non è vuota)
+                        new_marker = markers[0]
+                        self.new_markers.markers.append(new_marker)
+                    else:
+                        #ho bisogno di questo errore perchè viene creato un nuovo centroide solo se è nuovo 
+                        rospy.logwarn(f"Nessun marker restituito per il centroide {label} perchè lo avevo già visto")
+            
+            rospy.loginfo(f"totale markers pubblicati: {len(self.new_markers.markers)}")      
             self.pub.publish(self.new_markers)
 
 if __name__ == '__main__':

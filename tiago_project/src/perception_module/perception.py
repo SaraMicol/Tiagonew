@@ -319,6 +319,6 @@ class DetectObjects:
 if __name__ == "__main__":
     rospy.init_node("detection_node")
     node = DetectObjects()
-    rate = rospy.Rate(1/20.0)  # 1 cycle every 30 seconds
+    rate = rospy.Rate(1/10.0)  # 1 cycle every 30 seconds
     while not rospy.is_shutdown():
         node.publish_objects()
